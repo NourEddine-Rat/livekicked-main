@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, CheckCircle, Pause } from "lucide-react";
 import { format } from "date-fns";
+import { Link } from "wouter";
 
 interface Team {
   id: number;
@@ -92,55 +93,57 @@ export default function MatchCard({ match }: MatchCardProps) {
   };
 
   return (
-    <Card 
-      className="p-4 hover-elevate transition-all duration-200"
-      data-testid={`match-card-${match.id}`}
-    >
-      <div className="flex items-center justify-end mb-3">
-        {getStatusBadge()}
-      </div>
+    <Link href={`/match/${match.id}`}>
+      <Card 
+        className="p-4 hover-elevate transition-all duration-200 cursor-pointer hover:shadow-lg"
+        data-testid={`match-card-${match.id}`}
+      >
+        <div className="flex items-center justify-end mb-3">
+          {getStatusBadge()}
+        </div>
 
-      <div className="grid grid-cols-5 gap-4 items-center">
-        <div className="col-span-2 flex items-center gap-2">
-          <Avatar className="w-8 h-8 rounded-none">
-            <AvatarImage 
-              src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.home.id}.png`}
-              alt={match.home.name}
-            />
-            <AvatarFallback className="text-xs font-semibold bg-secondary">
-              {match.home.name.substring(0, 3).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-foreground truncate">
-              {match.home.name}
+        <div className="grid grid-cols-5 gap-4 items-center">
+          <div className="col-span-2 flex items-center gap-2">
+            <Avatar className="w-8 h-8 rounded-none">
+              <AvatarImage 
+                src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.home.id}.png`}
+                alt={match.home.name}
+              />
+              <AvatarFallback className="text-xs font-semibold bg-secondary">
+                {match.home.name.substring(0, 3).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground truncate">
+                {match.home.name}
+              </p>
+            </div>
+          </div>
+
+          <div className="col-span-1 text-center">
+            <p className="text-lg font-bold font-mono text-foreground">
+              {getScoreDisplay()}
             </p>
           </div>
-        </div>
 
-        <div className="col-span-1 text-center">
-          <p className="text-lg font-bold font-mono text-foreground">
-            {getScoreDisplay()}
-          </p>
-        </div>
-
-        <div className="col-span-2 flex items-center gap-2 justify-end">
-          <div className="flex-1 min-w-0 text-right">
-            <p className="text-sm font-medium text-foreground truncate">
-              {match.away.name}
-            </p>
+          <div className="col-span-2 flex items-center gap-2 justify-end">
+            <div className="flex-1 min-w-0 text-right">
+              <p className="text-sm font-medium text-foreground truncate">
+                {match.away.name}
+              </p>
+            </div>
+            <Avatar className="w-8 h-8 rounded-none">
+              <AvatarImage 
+                src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.away.id}.png`}
+                alt={match.away.name}
+              />
+              <AvatarFallback className="text-xs font-semibold bg-secondary">
+                {match.away.name.substring(0, 3).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
           </div>
-          <Avatar className="w-8 h-8 rounded-none">
-            <AvatarImage 
-              src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.away.id}.png`}
-              alt={match.away.name}
-            />
-            <AvatarFallback className="text-xs font-semibold bg-secondary">
-              {match.away.name.substring(0, 3).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
         </div>
-      </div>
-    </Card>
+      </Card>
+    </Link>
   );
 }

@@ -54,9 +54,10 @@ Preferred communication style: Simple, everyday language.
 - **Headers**: Custom user agent and referer headers for API compatibility
 
 ### Database Services
-- **Primary**: Neon Database (PostgreSQL) configured via DATABASE_URL environment variable
+- **Primary**: Configured for PostgreSQL via DATABASE_URL environment variable
 - **Connection**: @neondatabase/serverless for edge-compatible database connections
 - **Session Storage**: connect-pg-simple for PostgreSQL session storage (prepared)
+- **Current State**: Application works with external APIs without database dependency
 
 ### UI & Component Libraries
 - **Core UI**: Radix UI primitives for accessible components (dialogs, dropdowns, tooltips, etc.)
@@ -70,3 +71,20 @@ Preferred communication style: Simple, everyday language.
 - **ESLint/Prettier**: Code quality and formatting (configured via package.json)
 - **PostCSS**: CSS processing with Tailwind and Autoprefixer
 - **Replit Integration**: Development banner and error modal for Replit environment
+
+## Replit Environment Setup
+
+### Recent Changes (2025-09-21)
+- **Host Configuration**: Updated server binding from localhost to 0.0.0.0:5000 for Replit proxy compatibility
+- **Vite Configuration**: Added host: "0.0.0.0" and port: 5000 to support Replit's iframe proxy
+- **Workflow Setup**: Configured "Development Server" workflow running `npm run dev` on port 5000
+- **Deployment**: Configured autoscale deployment with build and run commands
+- **Dependencies**: Successfully installed all npm packages, application running without database requirement
+
+### Current Status
+- ✅ Frontend server accessible via Replit proxy on port 5000
+- ✅ Backend API endpoints functioning properly (/api/news, /api/leagues, /api/matches)
+- ✅ External football API integration working
+- ✅ Vite HMR connected and functioning
+- ✅ TypeScript compilation working despite LSP diagnostics
+- ✅ Ready for production deployment

@@ -98,6 +98,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proxy for individual match API - MUST come before the date route to avoid conflicts
+  app.get('/api/matches/detail/:matchId', async (req, res) => {
+    console.log('Match detail API route hit for:', req.params.matchId);
+    try {
+      const { matchId } = req.params;
+      
+      const response = await fetch(`https://api.livekicked.info/api/matches/${matchId}`, {
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'User-Agent': 'FootballLive-App',
+          'Referer': 'https://api.livekicked.info',
+          'Origin': 'https://api.livekicked.info',
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`Match detail API error for ${matchId}: ${response.status} ${response.statusText}`);
+        return res.status(response.status).json({ 
+          error: `Failed to fetch match data: ${response.statusText}` 
+        });
+      }
+
+      const data = await response.json();
+      console.log('Match data fetched successfully for:', matchId);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching match data:', error);
+      res.status(500).json({ error: 'Internal server error fetching match data' });
+    }
+  });
+
   // Proxy for matches API (requires auth/special headers)
   app.get('/api/matches/:date', async (req, res) => {
     try {
