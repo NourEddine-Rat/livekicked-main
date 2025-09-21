@@ -104,6 +104,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { matchId } = req.params;
       
+      // Validate match ID (should be numeric)
+      if (!matchId || !/^\d+$/.test(matchId)) {
+        return res.status(400).json({ error: 'Invalid match ID format' });
+      }
+      
+      // Check if match ID is reasonable length (prevent excessively long IDs)
+      if (matchId.length > 10) {
+        return res.status(400).json({ error: 'Invalid match ID length' });
+      }
+      
       const response = await fetch(`https://api.livekicked.info/api/matches/${matchId}`, {
         headers: {
           'Accept': 'application/json; charset=utf-8',
