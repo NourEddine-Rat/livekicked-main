@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Play, CheckCircle, Pause } from "lucide-react";
 import { format } from "date-fns";
@@ -94,17 +93,17 @@ export default function MatchCard({ match }: MatchCardProps) {
 
   return (
     <Link href={`/match/${match.id}`}>
-      <Card 
-        className="p-4 hover-elevate transition-all duration-200 cursor-pointer hover:shadow-lg"
+      <div 
+        className="p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/30 transition-all duration-200 cursor-pointer"
         data-testid={`match-card-${match.id}`}
       >
-        <div className="flex items-center justify-end mb-3">
+        <div className="flex items-center justify-end mb-2">
           {getStatusBadge()}
         </div>
 
-        <div className="grid grid-cols-5 gap-4 items-center">
-          <div className="col-span-2 flex items-center gap-2">
-            <Avatar className="w-8 h-8 rounded-none">
+        <div className="grid grid-cols-5 gap-2 sm:gap-4 items-center">
+          <div className="col-span-2 flex items-center gap-1 sm:gap-2">
+            <Avatar className="w-6 h-6 sm:w-8 sm:h-8 rounded-none flex-shrink-0">
               <AvatarImage 
                 src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.home.id}.png`}
                 alt={match.home.name}
@@ -114,25 +113,25 @@ export default function MatchCard({ match }: MatchCardProps) {
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-foreground truncate">
+              <p className="text-xs sm:text-sm font-medium text-foreground truncate">
                 {match.home.name}
               </p>
             </div>
           </div>
 
           <div className="col-span-1 text-center">
-            <p className="text-lg font-bold font-mono text-foreground">
+            <p className="text-sm sm:text-lg font-bold font-mono text-foreground">
               {getScoreDisplay()}
             </p>
           </div>
 
-          <div className="col-span-2 flex items-center gap-2 justify-end">
+          <div className="col-span-2 flex items-center gap-1 sm:gap-2 justify-end">
             <div className="flex-1 min-w-0 text-right">
-              <p className="text-sm font-medium text-foreground truncate">
+              <p className="text-xs sm:text-sm font-medium text-foreground truncate">
                 {match.away.name}
               </p>
             </div>
-            <Avatar className="w-8 h-8 rounded-none">
+            <Avatar className="w-6 h-6 sm:w-8 sm:h-8 rounded-none flex-shrink-0">
               <AvatarImage 
                 src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.away.id}.png`}
                 alt={match.away.name}
@@ -143,7 +142,7 @@ export default function MatchCard({ match }: MatchCardProps) {
             </Avatar>
           </div>
         </div>
-      </Card>
+      </div>
     </Link>
   );
 }

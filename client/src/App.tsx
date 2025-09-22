@@ -29,7 +29,9 @@ function App() {
           <div className="flex flex-col h-screen w-full">
             <TopNavigation />
             <main className="flex-1 overflow-y-auto">
-              <Router />
+              <div className="min-h-full">
+                <Router />
+              </div>
             </main>
           </div>
           <Toaster />

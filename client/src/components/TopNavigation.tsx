@@ -43,21 +43,24 @@ const menuItems = [
 export default function TopNavigation() {
   return (
     <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
-      <div className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-8">
+      <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4">
+        <div className="flex items-center gap-4 sm:gap-8">
           {/* Logo */}
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
               <Trophy className="w-5 h-5 text-primary-foreground" />
             </div>
-            <div>
+            <div className="hidden sm:block">
               <h1 className="text-lg font-bold text-foreground">FootballLive</h1>
               <p className="text-xs text-muted-foreground">Live Football Data</p>
+            </div>
+            <div className="sm:hidden">
+              <h1 className="text-base font-bold text-foreground">FootballLive</h1>
             </div>
           </div>
 
           {/* Navigation Menu */}
-          <nav className="flex items-center gap-2">
+          <nav className="hidden sm:flex items-center gap-2">
             {menuItems.map((item) => (
               <Button
                 key={item.title}

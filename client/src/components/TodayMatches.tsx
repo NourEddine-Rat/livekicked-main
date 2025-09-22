@@ -276,7 +276,7 @@ export default function TodayMatches() {
                     {leagueGroup.matches.length} {leagueGroup.matches.length === 1 ? 'match' : 'matches'}
                   </span>
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-4">
                   {leagueGroup.matches.map((match) => (
                     <MatchCard key={match.id} match={match} />
                   ))}

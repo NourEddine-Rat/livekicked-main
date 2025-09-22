@@ -346,10 +346,10 @@ export default function League() {
   };
 
   return (
-    <div className="container mx-auto px-4 py-6 space-y-6">
+    <div className="container mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
       {/* League Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0 mb-4 sm:mb-6">
+        <div className="flex items-center gap-2 sm:gap-4">
           <Link href="/">
             <Button variant="ghost" size="sm">
               <ArrowLeft className="w-4 h-4 mr-2" />
@@ -357,7 +357,7 @@ export default function League() {
             </Button>
           </Link>
           
-          <Avatar className="w-12 h-12 rounded-none">
+          <Avatar className="w-8 h-8 sm:w-12 sm:h-12 rounded-none">
             <AvatarImage 
               src={`https://images.fotmob.com/image_resources/logo/leaguelogo/${leagueData.details.id}.png`}
               alt={leagueData.details.name}
