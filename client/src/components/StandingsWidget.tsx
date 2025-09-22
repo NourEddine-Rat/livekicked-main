@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Link } from "wouter";
 
 interface Team {
   name: string;
@@ -115,20 +116,24 @@ export default function StandingsWidget() {
                 {team.idx}
               </div>
               
-              <Avatar className="w-8 h-8 rounded-none">
-                <AvatarImage 
-                  src={`https://images.fotmob.com/image_resources/logo/teamlogo/${team.id}.png`}
-                  alt={team.shortName}
-                />
-                <AvatarFallback className="text-xs font-semibold">
-                  {team.shortName.substring(0, 3).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
+              <Link href={`/team/${team.id}`} className="hover:opacity-75 transition-opacity">
+                <Avatar className="w-8 h-8 rounded-none cursor-pointer">
+                  <AvatarImage 
+                    src={`https://images.fotmob.com/image_resources/logo/teamlogo/${team.id}.png`}
+                    alt={team.shortName}
+                  />
+                  <AvatarFallback className="text-xs font-semibold">
+                    {team.shortName.substring(0, 3).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </Link>
               
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground truncate">
-                  {team.shortName}
-                </p>
+                <Link href={`/team/${team.id}`} className="hover:underline">
+                  <p className="text-sm font-medium text-foreground truncate cursor-pointer">
+                    {team.shortName}
+                  </p>
+                </Link>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-muted-foreground">
                     {team.played}G • {team.wins}W {team.draws}D {team.losses}L

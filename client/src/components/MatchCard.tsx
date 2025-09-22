@@ -91,31 +91,47 @@ export default function MatchCard({ match }: MatchCardProps) {
     return "- : -";
   };
 
+  const handleMatchClick = (e: React.MouseEvent) => {
+    // Only navigate to match if clicking on card area, not team links
+    if (e.target === e.currentTarget || (e.target as HTMLElement).closest('.match-card-content')) {
+      window.location.href = `/match/${match.id}`;
+    }
+  };
+
   return (
-    <Link href={`/match/${match.id}`}>
-      <div 
-        className="p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/30 transition-all duration-200 cursor-pointer"
-        data-testid={`match-card-${match.id}`}
-      >
+    <div 
+      className="p-3 rounded-lg border border-transparent hover:border-border hover:bg-muted/30 transition-all duration-200 cursor-pointer match-card-content"
+      data-testid={`match-card-${match.id}`}
+      onClick={handleMatchClick}
+    >
         <div className="flex items-center justify-end mb-2">
           {getStatusBadge()}
         </div>
 
         <div className="grid grid-cols-5 gap-2 sm:gap-4 items-center">
           <div className="col-span-2 flex items-center gap-1 sm:gap-2">
-            <Avatar className="w-6 h-6 sm:w-8 sm:h-8 rounded-none flex-shrink-0">
-              <AvatarImage 
-                src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.home.id}.png`}
-                alt={match.home.name}
-              />
-              <AvatarFallback className="text-xs font-semibold bg-secondary">
-                {match.home.name.substring(0, 3).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <Link href={`/team/${match.home.id}`}>
+              <div onClick={(e) => e.stopPropagation()} className="hover:opacity-75 transition-opacity">
+                <Avatar className="w-6 h-6 sm:w-8 sm:h-8 rounded-none flex-shrink-0 cursor-pointer">
+                  <AvatarImage 
+                    src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.home.id}.png`}
+                    alt={match.home.name}
+                  />
+                  <AvatarFallback className="text-xs font-semibold bg-secondary">
+                    {match.home.name.substring(0, 3).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </Link>
             <div className="flex-1 min-w-0">
-              <p className="text-xs sm:text-sm font-medium text-foreground truncate">
-                {match.home.name}
-              </p>
+              <Link href={`/team/${match.home.id}`}>
+                <p 
+                  className="text-xs sm:text-sm font-medium text-foreground truncate cursor-pointer hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {match.home.name}
+                </p>
+              </Link>
             </div>
           </div>
 
@@ -127,22 +143,30 @@ export default function MatchCard({ match }: MatchCardProps) {
 
           <div className="col-span-2 flex items-center gap-1 sm:gap-2 justify-end">
             <div className="flex-1 min-w-0 text-right">
-              <p className="text-xs sm:text-sm font-medium text-foreground truncate">
-                {match.away.name}
-              </p>
+              <Link href={`/team/${match.away.id}`}>
+                <p 
+                  className="text-xs sm:text-sm font-medium text-foreground truncate cursor-pointer hover:underline"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {match.away.name}
+                </p>
+              </Link>
             </div>
-            <Avatar className="w-6 h-6 sm:w-8 sm:h-8 rounded-none flex-shrink-0">
-              <AvatarImage 
-                src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.away.id}.png`}
-                alt={match.away.name}
-              />
-              <AvatarFallback className="text-xs font-semibold bg-secondary">
-                {match.away.name.substring(0, 3).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <Link href={`/team/${match.away.id}`}>
+              <div onClick={(e) => e.stopPropagation()} className="hover:opacity-75 transition-opacity">
+                <Avatar className="w-6 h-6 sm:w-8 sm:h-8 rounded-none flex-shrink-0 cursor-pointer">
+                  <AvatarImage 
+                    src={`https://images.fotmob.com/image_resources/logo/teamlogo/${match.away.id}.png`}
+                    alt={match.away.name}
+                  />
+                  <AvatarFallback className="text-xs font-semibold bg-secondary">
+                    {match.away.name.substring(0, 3).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </div>
+            </Link>
           </div>
         </div>
       </div>
-    </Link>
   );
 }

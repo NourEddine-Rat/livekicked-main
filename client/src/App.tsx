@@ -8,6 +8,7 @@ import TopNavigation from "@/components/TopNavigation";
 import Home from "@/pages/Home";
 import League from "@/pages/League";
 import Match from "@/pages/Match";
+import Team from "@/pages/Team";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -16,6 +17,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/league/:id" component={League} />
       <Route path="/match/:id" component={Match} />
+      <Route path="/team/:id" component={Team} />
       <Route component={NotFound} />
     </Switch>
   );
