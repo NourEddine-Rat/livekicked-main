@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, Link } from "wouter";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +52,7 @@ interface MatchData {
       utcTime: string;
       finished: boolean;
       started: boolean;
-      reason: { short: string; long: string };
+      reason?: { short: string; long: string };
       halfs: {
         firstHalfStarted: string;
         firstHalfEnded: string;
@@ -70,10 +70,10 @@ interface MatchData {
     matchFacts: {
       playerOfTheMatch?: {
         id: number;
-        name: { firstName: string; lastName: string; fullName: string };
+        name?: { firstName?: string; lastName?: string; fullName?: string };
         teamName: string;
         teamId: number;
-        rating: { num: string; isTop: { isTopRating: boolean } };
+        rating?: { num: string; isTop: { isTopRating: boolean } };
         minutesPlayed: number;
         stats: Array<{
           title: string;
@@ -137,6 +137,13 @@ export default function Match() {
     queryKey: [`/api/matches/detail/${matchId}`],
     enabled: !!matchId,
   });
+
+  // Reset to overview tab for upcoming matches or when switching matches
+  useEffect(() => {
+    if (matchData && !matchData.general.started) {
+      setActiveTab("overview");
+    }
+  }, [matchData?.general.started, matchId]);
 
   if (isLoading) {
     return (
@@ -251,7 +258,7 @@ export default function Match() {
                 </Badge>
               )}
               <Badge variant={isUpcoming ? "secondary" : "default"}>
-                {matchData.header.status.reason.short}
+                {matchData.header.status.reason?.short || "TBD"}
               </Badge>
             </div>
             <div className="text-sm text-muted-foreground">
@@ -294,20 +301,39 @@ export default function Match() {
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="events">Events</TabsTrigger>
-          <TabsTrigger value="stats">Statistics</TabsTrigger>
+          <TabsTrigger value="events" disabled={isUpcoming}>
+            Events {isUpcoming && "(Not Started)"}
+          </TabsTrigger>
+          <TabsTrigger value="stats" disabled={isUpcoming}>
+            Statistics {isUpcoming && "(Not Started)"}
+          </TabsTrigger>
           <TabsTrigger value="lineup" disabled={!matchData.content.lineup}>
             Lineup {!matchData.content.lineup && "(N/A)"}
           </TabsTrigger>
-          <TabsTrigger value="shotmap">Shot Map</TabsTrigger>
+          <TabsTrigger value="shotmap" disabled={isUpcoming}>
+            Shot Map {isUpcoming && "(Not Started)"}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Match Not Started Message */}
+              {isUpcoming && (
+                <Card>
+                  <CardContent className="text-center py-8">
+                    <div className="text-muted-foreground">
+                      <Clock className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+                      <h3 className="text-lg font-semibold mb-2">Match Not Started Yet</h3>
+                      <p className="text-sm">Player statistics and match events will be available once the match begins.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Player of the Match */}
-              {matchData.content.matchFacts.playerOfTheMatch && (
+              {matchData.content.matchFacts.playerOfTheMatch && !isUpcoming && (
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -320,17 +346,17 @@ export default function Match() {
                       <Avatar className="w-12 h-12">
                         <AvatarImage
                           src={`https://images.fotmob.com/image_resources/playerimages/${matchData.content.matchFacts.playerOfTheMatch.id}.png`}
-                          alt={matchData.content.matchFacts.playerOfTheMatch.name.fullName}
+                          alt={matchData.content.matchFacts.playerOfTheMatch.name?.fullName || 'Player'}
                         />
                         <AvatarFallback>
-                          {matchData.content.matchFacts.playerOfTheMatch.name.firstName.charAt(0)}
-                          {matchData.content.matchFacts.playerOfTheMatch.name.lastName.charAt(0)}
+                          {matchData.content.matchFacts.playerOfTheMatch.name?.firstName?.charAt(0) || 'P'}
+                          {matchData.content.matchFacts.playerOfTheMatch.name?.lastName?.charAt(0) || 'M'}
                         </AvatarFallback>
                       </Avatar>
                       
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold">
-                          {matchData.content.matchFacts.playerOfTheMatch.name.fullName}
+                          {matchData.content.matchFacts.playerOfTheMatch.name?.fullName || 'Unknown Player'}
                         </h3>
                         <p className="text-sm text-muted-foreground mb-2">
                           {matchData.content.matchFacts.playerOfTheMatch.teamName}
@@ -339,7 +365,7 @@ export default function Match() {
                         <div className="flex items-center gap-4 mb-4">
                           <div className="text-center">
                             <div className="text-2xl font-bold text-yellow-500">
-                              {matchData.content.matchFacts.playerOfTheMatch.rating.num}
+                              {matchData.content.matchFacts.playerOfTheMatch.rating?.num || "N/A"}
                             </div>
                             <div className="text-xs text-muted-foreground">Rating</div>
                           </div>
@@ -425,7 +451,7 @@ export default function Match() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status</span>
-                    <span>{matchData.header.status.reason.long}</span>
+                    <span>{matchData.header.status.reason?.long || "To be determined"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Competition</span>
@@ -507,7 +533,14 @@ export default function Match() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {matchData.content.matchFacts.events?.events ? (
+              {isUpcoming ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Clock className="w-12 h-12 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-semibold mb-2">Match Not Started Yet</h3>
+                  <p className="text-sm">Match events will appear here once the game begins.</p>
+                </div>
+              ) : (
+                matchData.content.matchFacts.events?.events ? (
                 <div className="space-y-4">
                   {/* Timeline container */}
                   <div className="relative">
@@ -677,17 +710,29 @@ export default function Match() {
                     </div>
                   )}
                 </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  Event details not available for this match
-                </div>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Event details not available for this match
+                  </div>
+                )
               )}
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="stats" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {isUpcoming ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <div className="text-muted-foreground">
+                  <Clock className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-semibold mb-2">Match Not Started Yet</h3>
+                  <p className="text-sm">Player statistics will be available once the match begins.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Player of the Match Detailed Stats */}
             {matchData.content.matchFacts.playerOfTheMatch && (
               <Card>
@@ -703,15 +748,15 @@ export default function Match() {
                       <Avatar className="w-16 h-16 mx-auto mb-2">
                         <AvatarImage
                           src={`https://images.fotmob.com/image_resources/playerimages/${matchData.content.matchFacts.playerOfTheMatch.id}.png`}
-                          alt={matchData.content.matchFacts.playerOfTheMatch.name.fullName}
+                          alt={matchData.content.matchFacts.playerOfTheMatch.name?.fullName || 'Player'}
                         />
                         <AvatarFallback>
-                          {matchData.content.matchFacts.playerOfTheMatch.name.firstName.charAt(0)}
-                          {matchData.content.matchFacts.playerOfTheMatch.name.lastName.charAt(0)}
+                          {matchData.content.matchFacts.playerOfTheMatch.name?.firstName?.charAt(0) || 'P'}
+                          {matchData.content.matchFacts.playerOfTheMatch.name?.lastName?.charAt(0) || 'M'}
                         </AvatarFallback>
                       </Avatar>
                       <h3 className="font-semibold text-lg">
-                        {matchData.content.matchFacts.playerOfTheMatch.name.fullName}
+                        {matchData.content.matchFacts.playerOfTheMatch.name?.fullName || 'Unknown Player'}
                       </h3>
                       <p className="text-sm text-muted-foreground">
                         {matchData.content.matchFacts.playerOfTheMatch.teamName}
@@ -854,7 +899,7 @@ export default function Match() {
                           <div className="flex justify-center gap-6">
                             <div className="text-center">
                               <div className="font-bold text-lg text-yellow-500">
-                                {matchData.content.matchFacts.playerOfTheMatch.rating.num}
+                                {matchData.content.matchFacts.playerOfTheMatch.rating?.num || "N/A"}
                               </div>
                               <div className="text-xs text-muted-foreground">Top Rating</div>
                             </div>
@@ -873,6 +918,7 @@ export default function Match() {
               </CardContent>
             </Card>
           </div>
+          )}
         </TabsContent>
 
         <TabsContent value="lineup" className="space-y-4">
@@ -1192,14 +1238,25 @@ export default function Match() {
         </TabsContent>
 
         <TabsContent value="shotmap" className="space-y-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="flex items-center gap-2 text-sm">
-                <Target className="w-4 h-4" />
-                Shot Map
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="pt-2">
+          {isUpcoming ? (
+            <Card>
+              <CardContent className="text-center py-8">
+                <div className="text-muted-foreground">
+                  <Clock className="w-16 h-16 mx-auto mb-4 text-muted-foreground/50" />
+                  <h3 className="text-lg font-semibold mb-2">Match Not Started Yet</h3>
+                  <p className="text-sm">Shot map will be available once the match begins.</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="flex items-center gap-2 text-sm">
+                  <Target className="w-4 h-4" />
+                  Shot Map
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-2">
               {(() => {
                 // Collect all shots from events
                 const shots = matchData.content.matchFacts.events?.events
@@ -1343,8 +1400,9 @@ export default function Match() {
                   </div>
                 );
               })()}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
       </Tabs>
     </div>
