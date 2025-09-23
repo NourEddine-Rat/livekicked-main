@@ -129,314 +129,375 @@ export default function Team() {
   const stadiumCapacity = details?.faqJSONLD?.mainEntity?.find(q => q.name.includes("capacity"));
   const stadiumOpened = details?.faqJSONLD?.mainEntity?.find(q => q.name.includes("opened"));
 
-  return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
-      {/* Back Button */}
-      <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={goBack} 
-          className="gap-2 hover:bg-muted/50"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </Button>
-      </div>
+  // Classify competitions into League vs Cup for side-by-side tables
+  const tablesArray = Array.isArray(teamData.table) ? teamData.table : [];
+  const isCupCompetition = (name: string = "") => /cup|champions|europa|conference|super|uefa|copa|shield|trophy/i.test(name);
+  const leagueTables = tablesArray.filter((t: any) => t?.data?.leagueName && !isCupCompetition(t.data.leagueName));
+  const cupTables = tablesArray.filter((t: any) => t?.data?.leagueName && isCupCompetition(t.data.leagueName));
 
-      {/* Header Section */}
-      <div className="mb-8">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-6">
-            <div className="relative">
-              <Avatar className="w-24 h-24 border-4 border-border shadow-lg">
-                <AvatarImage 
-                  src={`https://images.fotmob.com/image_resources/logo/teamlogo/${details?.id}.png`}
-                  alt={`${details?.name} logo`}
-                  className="object-contain p-2"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement;
-                    target.style.display = 'none';
-                  }}
-                />
-                <AvatarFallback className="text-2xl font-bold bg-gradient-to-br from-primary/20 to-primary/5">
-                  {details?.shortName?.substring(0, 2).toUpperCase() || details?.name?.substring(0, 2).toUpperCase() || 'TM'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="absolute -bottom-2 -right-2 w-8 h-8 bg-primary rounded-full flex items-center justify-center">
-                <Star className="w-4 h-4 text-primary-foreground" />
+  // Build a unified squad list from various possible API shapes
+  const squadList: any[] = (() => {
+    // 1) squad.players array
+    if (Array.isArray(teamData.squad?.players)) return teamData.squad.players as any[];
+    // 2) squad as array
+    if (Array.isArray(teamData.squad)) return teamData.squad as any[];
+    // 3) sportsTeamJSONLD.athlete
+    if (Array.isArray(teamData.sportsTeamJSONLD?.athlete)) return teamData.sportsTeamJSONLD.athlete as any[];
+    // 4) Deep search for plausible player arrays anywhere in the payload
+    const visited = new WeakSet<object>();
+    const candidates: any[] = [];
+    const isPlayerLike = (obj: any) => obj && typeof obj === 'object' && typeof obj.name === 'string' && (obj.role || obj.position || obj.positionName || typeof obj.id !== 'undefined');
+    const walk = (node: any) => {
+      if (!node || typeof node !== 'object') return;
+      if (visited.has(node)) return;
+      visited.add(node);
+      if (Array.isArray(node)) {
+        if (node.length > 0 && node.every(isPlayerLike)) {
+          candidates.push(...node);
+          return; // do not recurse into obvious player arrays further
+        }
+        node.forEach(walk);
+        return;
+      }
+      Object.values(node).forEach(walk);
+    };
+    walk(teamData);
+    return candidates;
+  })();
+
+  // Helpers to safely render possibly-object fields
+  const toText = (value: any): string => {
+    if (value == null) return '';
+    if (typeof value === 'string' || typeof value === 'number') return String(value);
+    if (typeof value === 'object') {
+      if (typeof (value as any).label === 'string') return (value as any).label as string;
+      if (typeof (value as any).name === 'string') return (value as any).name as string;
+      if (typeof (value as any).key === 'string') return (value as any).key as string;
+    }
+    return '';
+  };
+
+  const normalizePlayer = (raw: any) => {
+    if (!raw || typeof raw !== 'object') return null;
+    const id = typeof raw.id === 'number' || typeof raw.id === 'string' ? raw.id : undefined;
+    const name = toText(raw.name) || toText(raw.fullName) || '';
+    const fullName = toText(raw.fullName) || '';
+    const photo = raw.photo || raw.image || (id ? `https://images.fotmob.com/image_resources/playerimages/${id}.png` : '');
+    const position = toText(raw.position) || toText(raw.role) || toText(raw.positionName) || 'N/A';
+    const nationality = toText(raw.nationality) || toText(raw.country) || '';
+    const number = raw.number || raw.shirtNumber || '';
+    return { id, name: name || fullName || 'Unknown', fullName, photo, position, nationality, number };
+  };
+
+  const normalizedSquad = squadList
+    .map(normalizePlayer)
+    .filter((p): p is NonNullable<ReturnType<typeof normalizePlayer>> => !!p)
+    .filter((p, idx, arr) => arr.findIndex(q => String(q.id || q.name) === String(p.id || p.name)) === idx);
+
+  // Fixtures data from overviewFixtures
+  const fixturesData = Array.isArray((teamData as any).overviewFixtures) ? (teamData as any).overviewFixtures : [];
+
+  // Grouped squad structure: teamData.squad.squad[] with { title, members[] }
+  const groupedSquad: Array<{ title: string; members: ReturnType<typeof normalizePlayer>[] }> = (() => {
+    const groups = Array.isArray((teamData as any).squad?.squad) ? (teamData as any).squad.squad : [];
+    if (!Array.isArray(groups) || groups.length === 0) return [];
+    const titleToShortPos = (t: string) => {
+      const s = t.toLowerCase();
+      if (/keeper|goal/i.test(s)) return 'GK';
+      if (/defen/i.test(s)) return 'DEF';
+      if (/mid/i.test(s)) return 'MID';
+      if (/attack|forw|strik/i.test(s)) return 'FWD';
+      if (/coach|manager/i.test(s)) return 'Coach';
+      return '';
+    };
+    const normGroups = groups.map((g: any) => {
+      const title = String(g?.title || 'Squad');
+      const members = Array.isArray(g?.members) ? g.members : [];
+      const shortPos = titleToShortPos(title);
+      const normMembers = members.map((m: any) => {
+        const n = normalizePlayer(m);
+        if (!n) return null;
+        const roleObj = m?.role;
+        const roleText = typeof roleObj === 'object' ? (roleObj.fallback || roleObj.key || '') : toText(roleObj);
+        const ccode = toText(m?.ccode);
+        const cname = toText(m?.cname);
+        return {
+          ...n,
+          position: n.position === 'N/A' ? (shortPos || roleText || 'N/A') : n.position,
+          nationality: n.nationality || cname || ccode,
+          number: n.number,
+        };
+      }).filter(Boolean) as ReturnType<typeof normalizePlayer>[];
+      return { title, members: normMembers };
+    }).filter((g: any) => g.members && g.members.length > 0);
+    return normGroups;
+  })();
+
+  return (
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Back Button */}
+        <div className="mb-6">
+          <Button 
+            variant="ghost" 
+            onClick={goBack} 
+            className="gap-2 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+        </div>
+
+        {/* Professional Header Section */}
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex items-center gap-6">
+              <div className="relative">
+                <Avatar className="w-20 h-20 border-2 border-gray-200 dark:border-gray-600 shadow-sm">
+                  <AvatarImage 
+                    src={`https://images.fotmob.com/image_resources/logo/teamlogo/${details?.id}.png`}
+                    alt={`${details?.name} logo`}
+                    className="object-contain p-2"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement;
+                      target.style.display = 'none';
+                    }}
+                  />
+                  <AvatarFallback className="text-xl font-bold bg-gray-100 dark:bg-gray-700">
+                    {details?.shortName?.substring(0, 2).toUpperCase() || details?.name?.substring(0, 2).toUpperCase() || 'TM'}
+                  </AvatarFallback>
+                </Avatar>
               </div>
-            </div>
-            <div>
-              <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-foreground to-muted-foreground bg-clip-text text-transparent">
-                {details?.name || 'Team'}
-              </h1>
-              <div className="flex items-center gap-4 mb-3">
-                <Badge variant="secondary" className="text-sm px-3 py-1">
-                  {details?.country || 'N/A'}
-                </Badge>
-                <Badge variant="outline" className="text-sm px-3 py-1">
-                  {details?.latestSeason || 'Current Season'}
-                </Badge>
-              </div>
-              {league && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Trophy className="w-4 h-4 text-amber-500" />
-                  <span className="font-medium">{league.name}</span>
+              <div className="flex-1">
+                <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+                  {details?.name || 'Team'}
+                </h1>
+                <div className="flex flex-wrap items-center gap-3 mb-3">
+                  <Badge variant="secondary" className="text-sm">
+                    {details?.country || 'N/A'}
+                  </Badge>
+                  <Badge variant="outline" className="text-sm">
+                    {details?.latestSeason || 'Current Season'}
+                  </Badge>
+                  {stadiumOpened?.acceptedAnswer.text.match(/(\d{4})/)?.[1] && (
+                    <Badge variant="outline" className="text-sm">
+                      Founded {stadiumOpened.acceptedAnswer.text.match(/(\d{4})/)?.[1]}
+                    </Badge>
+                  )}
                 </div>
-              )}
+                {league && (
+                  <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                    <Trophy className="w-4 h-4" />
+                    <span className="font-medium">{league.name}</span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-          
-          <div className="flex gap-2">
-            {sportsTeamJSONLD?.url && (
-              <Button 
-                variant="outline" 
-                className="gap-2" 
-                size="sm"
-                onClick={() => {
-                  const url = sportsTeamJSONLD.url;
-                  if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
-                    const newWindow = window.open(url, '_blank');
-                    if (newWindow) newWindow.opener = null;
-                  }
-                }}
-              >
-                <ExternalLink className="w-4 h-4" />
-                Official Site
+            
+            <div className="flex gap-3">
+              {sportsTeamJSONLD?.url && (
+                <Button 
+                  variant="outline" 
+                  className="gap-2" 
+                  size="sm"
+                  onClick={() => {
+                    const url = sportsTeamJSONLD.url;
+                    if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+                      const newWindow = window.open(url, '_blank');
+                      if (newWindow) newWindow.opener = null;
+                    }
+                  }}
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  Official Site
+                </Button>
+              )}
+              <Button variant="default" className="gap-2" size="sm">
+                <Star className="w-4 h-4" />
+                Follow
               </Button>
-            )}
-            <Button variant="default" className="gap-2" size="sm">
-              <Star className="w-4 h-4" />
-              Follow
-            </Button>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Enhanced Quick Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <Card className="border-0 shadow-md bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-blue-500/10">
-                <MapPin className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+        {/* Professional Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Users className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Squad Size</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{normalizedSquad.length || groupedSquad.reduce((acc, group) => acc + group.members.length, 0)}</p>
+                </div>
               </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Stadium</p>
-                <p className="text-lg font-bold">{stadium?.name || 'N/A'}</p>
-                <p className="text-xs text-muted-foreground">
-                  {stadium?.address?.addressLocality || ''}
-                </p>
+            </CardContent>
+          </Card>
+          
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <Trophy className="w-5 h-5 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Competitions</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{tablesArray.length}</p>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+          
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
+                  <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Upcoming</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{fixturesData.filter((f: any) => !f.status?.finished && !f.notStarted).length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="hover:shadow-md transition-shadow">
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 dark:bg-orange-900/30 rounded-lg">
+                  <Target className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recent</p>
+                  <p className="text-xl font-bold text-gray-900 dark:text-white">{fixturesData.filter((f: any) => f.status?.finished).length}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
 
-        <Card className="border-0 shadow-md bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-green-500/10">
-                <Users className="w-5 h-5 text-green-600 dark:text-green-400" />
+        {/* Professional Tabs Layout */}
+        <Card className="shadow-sm border border-gray-200 dark:border-gray-700">
+          <CardContent className="p-0">
+            <Tabs defaultValue="overview" className="w-full">
+              <div className="border-b border-gray-200 dark:border-gray-700">
+                <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 h-12 bg-transparent rounded-none p-0">
+                  {teamData.tabs.map((tab) => (
+                    <TabsTrigger 
+                      key={tab} 
+                      value={tab} 
+                      className="capitalize text-sm font-medium data-[state=active]:bg-gray-100 data-[state=active]:dark:bg-gray-700 data-[state=active]:text-gray-900 data-[state=active]:dark:text-white text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors rounded-none border-b-2 data-[state=active]:border-blue-500 data-[state=inactive]:border-transparent"
+                    >
+                      {tab === 'overview' && <Star className="w-4 h-4 mr-2" />}
+                      {tab === 'table' && <Trophy className="w-4 h-4 mr-2" />}
+                      {tab === 'fixtures' && <Calendar className="w-4 h-4 mr-2" />}
+                      {tab === 'squad' && <Users className="w-4 h-4 mr-2" />}
+                      {tab === 'stats' && <Target className="w-4 h-4 mr-2" />}
+                      <span className="hidden sm:inline">{tab}</span>
+                      <span className="sm:hidden">{tab.charAt(0).toUpperCase()}</span>
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
               </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Capacity</p>
-                <p className="text-lg font-bold">
-                  {stadiumCapacity?.acceptedAnswer.text.match(/(\d+)/)?.[1] || "N/A"}
-                </p>
-                <p className="text-xs text-muted-foreground">seats</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
-        <Card className="border-0 shadow-md bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-purple-500/10">
-                <Calendar className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Founded</p>
-                <p className="text-lg font-bold">
-                  {stadiumOpened?.acceptedAnswer.text.match(/(\d{4})/)?.[1] || "N/A"}
-                </p>
-                <p className="text-xs text-muted-foreground">stadium opened</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-md bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/10">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-full bg-orange-500/10">
-                <Zap className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Next Match</p>
-                <p className="text-sm font-bold">
-                  {nextMatch ? (
-                    nextMatch.acceptedAnswer.text.includes("against") ? 
-                      nextMatch.acceptedAnswer.text.split("against ")[1]?.split(".")[0] 
-                      : "TBD"
-                  ) : "No upcoming"}
-                </p>
-                <p className="text-xs text-muted-foreground">
-                  {nextMatch && nextMatch.acceptedAnswer.text.includes("at") ? 
-                    nextMatch.acceptedAnswer.text.split("at ")[1]?.split(" on")[0] 
-                    : ""}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Enhanced Main Content Tabs */}
-      <Card className="border-0 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
-          <CardTitle className="flex items-center gap-2">
-            <Award className="w-5 h-5" />
-            Team Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 h-12 bg-muted/30 rounded-none">
-              {teamData.tabs.map((tab) => (
-                <TabsTrigger 
-                  key={tab} 
-                  value={tab} 
-                  className="capitalize text-sm font-medium data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-                >
-                  {tab === 'overview' && <Star className="w-4 h-4 mr-1" />}
-                  {tab === 'table' && <Trophy className="w-4 h-4 mr-1" />}
-                  {tab === 'fixtures' && <Calendar className="w-4 h-4 mr-1" />}
-                  {tab === 'squad' && <Users className="w-4 h-4 mr-1" />}
-                  {tab === 'stats' && <Target className="w-4 h-4 mr-1" />}
-                  <span className="hidden sm:inline">{tab}</span>
-                  <span className="sm:hidden">{tab.charAt(0).toUpperCase()}</span>
-                </TabsTrigger>
-              ))}
-            </TabsList>
-
-            <TabsContent value="overview" className="mt-0 p-6">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Enhanced Team Details */}
-                <Card className="border-0 bg-gradient-to-br from-slate-50 to-slate-100/50 dark:from-slate-900/20 dark:to-slate-800/10">
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Award className="w-5 h-5 text-primary" />
-                      Team Details
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Full Name</p>
-                        <p className="font-semibold text-lg">{details?.name || 'N/A'}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Short Name</p>
-                        <p className="font-semibold text-lg">{details?.shortName || 'N/A'}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Country</p>
-                        <p className="font-semibold text-lg">{details?.country || 'N/A'}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Sport</p>
-                        <p className="font-semibold text-lg capitalize">{sportsTeamJSONLD?.sport?.split("/")[0] || 'Football'}</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Enhanced Stadium Information */}
-                <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-900/20 dark:to-blue-800/10">
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <MapPin className="w-5 h-5 text-blue-600" />
-                      Stadium Information
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <p className="text-sm font-medium text-muted-foreground">Stadium Name</p>
-                        <p className="font-semibold text-lg">{stadium?.name || 'Not available'}</p>
-                      </div>
-                      {stadium?.address && (
+              <TabsContent value="overview" className="mt-0 p-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Team Details */}
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Award className="w-5 h-5 text-blue-600" />
+                        Team Details
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
-                          <p className="text-sm font-medium text-muted-foreground">Location</p>
-                          <p className="font-semibold">
-                            {stadium.address.addressLocality}{stadium.address.addressCountry && `, ${stadium.address.addressCountry}`}
-                          </p>
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Full Name</p>
+                          <p className="font-semibold text-lg">{details?.name || 'N/A'}</p>
                         </div>
-                      )}
-                      {stadium?.geo && (
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-muted-foreground">Latitude</p>
-                            <p className="font-mono text-sm bg-muted/50 px-2 py-1 rounded">{stadium.geo.latitude}</p>
-                          </div>
-                          <div className="space-y-1">
-                            <p className="text-sm font-medium text-muted-foreground">Longitude</p>
-                            <p className="font-mono text-sm bg-muted/50 px-2 py-1 rounded">{stadium.geo.longitude}</p>
-                          </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Short Name</p>
+                          <p className="font-semibold text-lg">{details?.shortName || 'N/A'}</p>
                         </div>
-                      )}
-                      {stadium?.geo && (
-                        <Button 
-                          variant="default" 
-                          size="sm" 
-                          className="w-full gap-2 mt-4 bg-blue-600 hover:bg-blue-700"
-                          onClick={() => {
-                            const url = `https://maps.google.com/maps?q=${stadium.geo.latitude},${stadium.geo.longitude}`;
-                            window.open(url, '_blank');
-                          }}
-                        >
-                          <MapPin className="w-4 h-4" />
-                          View on Map
-                        </Button>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Country</p>
+                          <p className="font-semibold text-lg">{details?.country || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Sport</p>
+                          <p className="font-semibold text-lg capitalize">{sportsTeamJSONLD?.sport?.split("/")[0] || 'Football'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-              {/* Enhanced FAQ Section */}
-              {details?.faqJSONLD?.mainEntity && details.faqJSONLD.mainEntity.length > 0 && (
-                <Card className="mt-6 border-0 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-900/20 dark:to-green-800/10">
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Zap className="w-5 h-5 text-green-600" />
-                      Frequently Asked Questions
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {details.faqJSONLD.mainEntity.map((faq, index) => (
-                        <div key={index} className="border-l-4 border-green-500 pl-4 py-2 bg-white/50 dark:bg-black/20 rounded-r">
-                          <h4 className="font-semibold mb-2 text-green-800 dark:text-green-200">{faq.name}</h4>
-                          <p className="text-muted-foreground leading-relaxed">{faq.acceptedAnswer.text}</p>
+                  {/* Performance Overview */}
+                  <Card className="hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Target className="w-5 h-5 text-green-600" />
+                        Performance Overview
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Competitions</p>
+                          <p className="font-semibold text-lg">{tablesArray.length}</p>
                         </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Squad Members</p>
+                          <p className="font-semibold text-lg">{normalizedSquad.length || groupedSquad.reduce((acc, group) => acc + group.members.length, 0)}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Upcoming Fixtures</p>
+                          <p className="font-semibold text-lg">{fixturesData.filter((f: any) => !f.status?.finished && !f.notStarted).length}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Recent Matches</p>
+                          <p className="font-semibold text-lg">{fixturesData.filter((f: any) => f.status?.finished).length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* FAQ Section */}
+                {details?.faqJSONLD?.mainEntity && details.faqJSONLD.mainEntity.length > 0 && (
+                  <Card className="mt-6 hover:shadow-md transition-shadow">
+                    <CardHeader>
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        <Zap className="w-5 h-5 text-yellow-600" />
+                        Frequently Asked Questions
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {details.faqJSONLD.mainEntity.map((faq, index) => (
+                          <div key={index} className="border-l-4 border-yellow-400 pl-4 py-3 bg-gray-50 dark:bg-gray-800/50 rounded-r">
+                            <h4 className="font-semibold mb-2">{faq.name}</h4>
+                            <p className="text-gray-600 dark:text-gray-400 leading-relaxed">{faq.acceptedAnswer.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
             </TabsContent>
 
-            {/* Table Tab */}
-            <TabsContent value="table" className="mt-0 p-6">
-              <Card className="border-0">
-                <CardHeader>
+              {/* Table Tab */}
+              <TabsContent value="table" className="mt-0 p-6">
+                <Card className="hover:shadow-md transition-shadow">
+                {/* <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Trophy className="w-5 h-5 text-amber-500" />
                     League Table
                   </CardTitle>
-                </CardHeader>
+                </CardHeader> */}
                 <CardContent>
                   {Array.isArray(teamData.table) && teamData.table.length > 0 ? (
                     <div className="space-y-6">
@@ -648,9 +709,9 @@ export default function Team() {
               </Card>
             </TabsContent>
 
-            {/* Fixtures Tab */}
-            <TabsContent value="fixtures" className="mt-0 p-6">
-              <Card className="border-0">
+              {/* Fixtures Tab */}
+              <TabsContent value="fixtures" className="mt-0 p-6">
+                <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-blue-500" />
@@ -658,174 +719,97 @@ export default function Team() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {teamData.fixtures ? (
+                  {fixturesData.length > 0 ? (
                     <div className="space-y-6">
-                      {/* Next Match Highlight */}
-                      {teamData.nextMatch && (
-                        <div className="mb-6">
-                          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                            <Zap className="w-5 h-5 text-orange-500" />
-                            Next Match
-                          </h3>
-                          <Card className="border-2 border-orange-200 bg-gradient-to-r from-orange-50 to-orange-100/30 dark:from-orange-950/20 dark:to-orange-900/10">
-                            <CardContent className="pt-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage 
-                                        src={`https://images.fotmob.com/image_resources/logo/teamlogo/${teamData.nextMatch.homeTeam?.id || details?.id}.png`}
-                                        alt="Home team"
-                                      />
-                                      <AvatarFallback className="text-xs">H</AvatarFallback>
-                                    </Avatar>
-                                    <span className="font-semibold">{teamData.nextMatch.homeTeam?.name || details?.name}</span>
-                                  </div>
-                                  <span className="text-2xl font-bold text-muted-foreground">vs</span>
-                                  <div className="flex items-center gap-3">
-                                    <span className="font-semibold">{teamData.nextMatch.awayTeam?.name || 'TBD'}</span>
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage 
-                                        src={`https://images.fotmob.com/image_resources/logo/teamlogo/${teamData.nextMatch.awayTeam?.id}.png`}
-                                        alt="Away team"
-                                      />
-                                      <AvatarFallback className="text-xs">A</AvatarFallback>
-                                    </Avatar>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-semibold">{teamData.nextMatch.date}</p>
-                                  <p className="text-sm text-muted-foreground">{teamData.nextMatch.time}</p>
-                                  <Badge variant="outline" className="mt-1">{teamData.nextMatch.competition}</Badge>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      )}
-
-                      {/* Last Match */}
-                      {teamData.lastMatch && (
-                        <div className="mb-6">
-                          <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
-                            <Calendar className="w-5 h-5 text-blue-500" />
-                            Last Match
-                          </h3>
-                          <Card className="border-l-4 border-l-blue-500">
-                            <CardContent className="pt-4">
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-4">
-                                  <div className="flex items-center gap-3">
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage 
-                                        src={`https://images.fotmob.com/image_resources/logo/teamlogo/${teamData.lastMatch.homeTeam?.id}.png`}
-                                        alt="Home team"
-                                      />
-                                      <AvatarFallback className="text-xs">H</AvatarFallback>
-                                    </Avatar>
-                                    <span className="font-semibold">{teamData.lastMatch.homeTeam?.name}</span>
-                                  </div>
-                                  <div className="text-center">
-                                    <div className="text-2xl font-bold">
-                                      {teamData.lastMatch.score || teamData.lastMatch.homeScore || '0'} - {teamData.lastMatch.awayScore || '0'}
-                                    </div>
-                                    <Badge variant={teamData.lastMatch.result === 'W' ? 'default' : teamData.lastMatch.result === 'D' ? 'secondary' : 'destructive'} className="text-xs">
-                                      {teamData.lastMatch.result || 'FT'}
-                                    </Badge>
-                                  </div>
-                                  <div className="flex items-center gap-3">
-                                    <span className="font-semibold">{teamData.lastMatch.awayTeam?.name}</span>
-                                    <Avatar className="w-8 h-8">
-                                      <AvatarImage 
-                                        src={`https://images.fotmob.com/image_resources/logo/teamlogo/${teamData.lastMatch.awayTeam?.id}.png`}
-                                        alt="Away team"
-                                      />
-                                      <AvatarFallback className="text-xs">A</AvatarFallback>
-                                    </Avatar>
-                                  </div>
-                                </div>
-                                <div className="text-right">
-                                  <p className="font-semibold">{teamData.lastMatch.date}</p>
-                                  <Badge variant="outline" className="mt-1">{teamData.lastMatch.competition}</Badge>
-                                </div>
-                              </div>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      )}
-
-                      {/* Fixtures List */}
-                      {Array.isArray(teamData.fixtures?.allFixtures) && teamData.fixtures.allFixtures.length > 0 && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-4">All Fixtures</h3>
-                          <div className="space-y-2">
-                            {teamData.fixtures.allFixtures?.slice(0, 10).map((fixture: any, index: number) => (
-                              <Card key={index} className="hover:bg-muted/50 transition-colors">
+                      {/* Recent/Upcoming Matches */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Recent & Upcoming Matches</h3>
+                        <div className="space-y-2">
+                          {fixturesData.slice(0, 10).map((fixture: any, index: number) => {
+                            const isHome = fixture.home?.id === details?.id;
+                            const opponent = isHome ? fixture.away : fixture.home;
+                            const teamScore = isHome ? fixture.home?.score : fixture.away?.score;
+                            const opponentScore = isHome ? fixture.away?.score : fixture.home?.score;
+                            const matchDate = new Date(fixture.status?.utcTime || '');
+                            const isFinished = fixture.status?.finished;
+                            const isNotStarted = fixture.notStarted || (!fixture.status?.started && !fixture.status?.finished);
+                            
+                            return (
+                              <Card key={fixture.id || index} className="hover:bg-muted/50 transition-colors">
                                 <CardContent className="py-3">
                                   <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-4">
                                       <div className="w-16 text-xs text-muted-foreground">
-                                        {fixture.date ? format(new Date(fixture.date), 'MMM dd') : 'TBD'}
+                                        {matchDate ? format(matchDate, 'MMM dd') : 'TBD'}
                                       </div>
                                       <div className="flex items-center gap-3 min-w-[300px]">
                                         <div className="flex items-center gap-2">
                                           <Avatar className="w-6 h-6">
                                             <AvatarImage 
-                                              src={`https://images.fotmob.com/image_resources/logo/teamlogo/${fixture.home?.id}.png`}
-                                              alt="Home team"
+                                              src={`https://images.fotmob.com/image_resources/logo/teamlogo/${details?.id}.png`}
+                                              alt="Team"
                                             />
-                                            <AvatarFallback className="text-xs">H</AvatarFallback>
+                                            <AvatarFallback className="text-xs">T</AvatarFallback>
                                           </Avatar>
-                                          <span className="text-sm font-medium">{fixture.home?.name}</span>
+                                          <span className="text-sm font-medium">{details?.name}</span>
                                         </div>
                                         <div className="text-center mx-2">
-                                          {fixture.status === 'finished' ? (
+                                          {isFinished ? (
                                             <div className="text-sm font-bold">
-                                              {fixture.home?.score} - {fixture.away?.score}
+                                              {teamScore} - {opponentScore}
                                             </div>
-                                          ) : (
+                                          ) : isNotStarted ? (
                                             <div className="text-sm text-muted-foreground">vs</div>
+                                          ) : (
+                                            <div className="text-sm font-bold text-orange-600">
+                                              {fixture.status?.scoreStr || 'LIVE'}
+                                            </div>
                                           )}
                                         </div>
                                         <div className="flex items-center gap-2">
-                                          <span className="text-sm font-medium">{fixture.away?.name}</span>
+                                          <span className="text-sm font-medium">{opponent?.name}</span>
                                           <Avatar className="w-6 h-6">
                                             <AvatarImage 
-                                              src={`https://images.fotmob.com/image_resources/logo/teamlogo/${fixture.away?.id}.png`}
-                                              alt="Away team"
+                                              src={`https://images.fotmob.com/image_resources/logo/teamlogo/${opponent?.id}.png`}
+                                              alt="Opponent"
                                             />
-                                            <AvatarFallback className="text-xs">A</AvatarFallback>
+                                            <AvatarFallback className="text-xs">O</AvatarFallback>
                                           </Avatar>
                                         </div>
                                       </div>
                                     </div>
                                     <div className="flex items-center gap-2">
                                       <Badge variant="outline" className="text-xs">
-                                        {fixture.competition || 'League'}
+                                        {fixture.tournament?.name || 'League'}
                                       </Badge>
-                                      {fixture.status && (
-                                        <Badge 
-                                          variant={fixture.status === 'finished' ? 'secondary' : 'default'} 
-                                          className="text-xs"
-                                        >
-                                          {fixture.status === 'finished' ? 'FT' : fixture.time || fixture.status}
+                                      {isFinished ? (
+                                        <Badge variant="secondary" className="text-xs">
+                                          {fixture.status?.reason?.short || 'FT'}
+                                        </Badge>
+                                      ) : isNotStarted ? (
+                                        <Badge variant="outline" className="text-xs">
+                                          {matchDate ? format(matchDate, 'HH:mm') : 'TBD'}
+                                        </Badge>
+                                      ) : (
+                                        <Badge variant="destructive" className="text-xs">
+                                          LIVE
                                         </Badge>
                                       )}
                                     </div>
                                   </div>
                                 </CardContent>
                               </Card>
-                            ))}
-                          </div>
-                          {(teamData.fixtures?.allFixtures?.length || 0) > 10 && (
-                            <div className="text-center mt-4">
-                              <Badge variant="secondary">
-                                Showing 10 of {teamData.fixtures?.allFixtures?.length || 0} fixtures
-                              </Badge>
-                            </div>
-                          )}
+                            );
+                          })}
                         </div>
-                      )}
+                        {fixturesData.length > 10 && (
+                          <div className="text-center mt-4">
+                            <Badge variant="secondary">
+                              Showing 10 of {fixturesData.length} matches
+                            </Badge>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-12">
@@ -840,9 +824,9 @@ export default function Team() {
               </Card>
             </TabsContent>
 
-            {/* Squad Tab */}
-            <TabsContent value="squad" className="mt-0 p-6">
-              <Card className="border-0">
+              {/* Squad Tab */}
+              <TabsContent value="squad" className="mt-0 p-6">
+                <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="w-5 h-5 text-green-500" />
@@ -850,50 +834,48 @@ export default function Team() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {(teamData.squad && (teamData.squad.players || teamData.squad.length > 0)) || (teamData.sportsTeamJSONLD?.athlete && teamData.sportsTeamJSONLD.athlete.length > 0) ? (
+                  {groupedSquad.length > 0 || normalizedSquad.length > 0 ? (
                     <div className="space-y-6">
-                      {/* Squad Overview */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                        <Card className="border-0 bg-gradient-to-br from-green-50 to-green-100/50 dark:from-green-950/20 dark:to-green-900/10">
-                          <CardContent className="pt-4 text-center">
-                            <div className="text-2xl font-bold text-green-600">
-                              {teamData.squad?.players?.length || 
-                               (Array.isArray(teamData.squad) ? teamData.squad.length : 0) || 
-                               (teamData.sportsTeamJSONLD?.athlete?.length || 0)}
-                            </div>
-                            <p className="text-sm text-muted-foreground">Total Players</p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border-0 bg-gradient-to-br from-blue-50 to-blue-100/50 dark:from-blue-950/20 dark:to-blue-900/10">
-                          <CardContent className="pt-4 text-center">
-                            <div className="text-2xl font-bold text-blue-600">
-                              {(teamData.squad?.players || []).filter((p: any) => p.position?.includes('GK') || p.role?.includes('Goalkeeper')).length || 0}
-                            </div>
-                            <p className="text-sm text-muted-foreground">Goalkeepers</p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border-0 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/20 dark:to-purple-900/10">
-                          <CardContent className="pt-4 text-center">
-                            <div className="text-2xl font-bold text-purple-600">
-                              {(teamData.squad?.players || []).filter((p: any) => p.position?.includes('DEF') || p.role?.includes('Defender')).length || 0}
-                            </div>
-                            <p className="text-sm text-muted-foreground">Defenders</p>
-                          </CardContent>
-                        </Card>
-                        <Card className="border-0 bg-gradient-to-br from-orange-50 to-orange-100/50 dark:from-orange-950/20 dark:to-orange-900/10">
-                          <CardContent className="pt-4 text-center">
-                            <div className="text-2xl font-bold text-orange-600">
-                              {(teamData.squad?.players || []).filter((p: any) => p.position?.includes('MID') || p.position?.includes('FWD') || p.role?.includes('Midfielder') || p.role?.includes('Forward')).length || 0}
-                            </div>
-                            <p className="text-sm text-muted-foreground">Mid/Forwards</p>
-                          </CardContent>
-                        </Card>
-                      </div>
-
-                      {/* Players List */}
-                      {Array.isArray(teamData.squad?.players || teamData.squad) && (teamData.squad?.players || teamData.squad).length > 0 && (
-                        <div>
-                          <h3 className="text-lg font-semibold mb-4">Squad List</h3>
+                      {/* Combined Squad Display */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Squad</h3>
+                        
+                        {/* Grouped Squad Display */}
+                        {groupedSquad.length > 0 ? (
+                          <div className="space-y-6">
+                            {groupedSquad.map((group) => (
+                              <div key={group.title} className="space-y-3">
+                                <div className="flex items-center gap-2">
+                                  <h4 className="text-md font-semibold text-gray-700 dark:text-gray-300 capitalize">{group.title}</h4>
+                                  <Badge variant="outline" className="text-xs">{group.members.length} players</Badge>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+                                  {group.members.map((player) => {
+                                    if (!player) return null;
+                                    return (
+                                      <div key={String(player.id || player.name)} className="flex items-center gap-3 p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                                        <Avatar className="w-10 h-10">
+                                          <AvatarImage src={player.photo} alt={`${player.name} photo`} />
+                                          <AvatarFallback className="text-xs">{(player.name || '').split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??'}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 min-w-0">
+                                          <p className="text-sm font-medium truncate">{player.name}</p>
+                                          <div className="flex items-center gap-2 mt-1">
+                                            <Badge variant="secondary" className="text-xs">{player.position}</Badge>
+                                            {player.number && (
+                                              <span className="text-xs text-gray-500 dark:text-gray-400">#{player.number}</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          /* Fallback to table view for normalized squad */
                           <div className="overflow-x-auto">
                             <Table>
                               <TableHeader>
@@ -902,121 +884,62 @@ export default function Team() {
                                   <TableHead className="min-w-[200px]">Player</TableHead>
                                   <TableHead>Position</TableHead>
                                   <TableHead className="text-center">Age</TableHead>
-                                  <TableHead className="text-center">Nat</TableHead>
+                                  <TableHead className="text-center">Nationality</TableHead>
                                   <TableHead className="text-center">Apps</TableHead>
                                   <TableHead className="text-center">Goals</TableHead>
                                   <TableHead className="text-center">Assists</TableHead>
                                 </TableRow>
                               </TableHeader>
                               <TableBody>
-                                {(teamData.squad?.players || teamData.squad || []).map((player: any, index: number) => (
-                                  <TableRow key={player.id || index} className="hover:bg-muted/50">
-                                    <TableCell className="font-medium">
-                                      {player.number || player.shirtNumber || index + 1}
-                                    </TableCell>
+                                {normalizedSquad.map((player: any, index: number) => (
+                                  <TableRow key={player.id || player.name || index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                                    <TableCell className="font-medium">{player.number || index + 1}</TableCell>
                                     <TableCell>
                                       <div className="flex items-center gap-3">
                                         <Avatar className="w-8 h-8">
-                                          <AvatarImage 
-                                            src={player.photo || `https://images.fotmob.com/image_resources/playerimages/${player.id}.png`}
-                                            alt={`${player.name} photo`}
-                                          />
-                                          <AvatarFallback className="text-xs">
-                                            {player.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??'}
-                                          </AvatarFallback>
+                                          <AvatarImage src={player.photo} alt={`${player.name} photo`} />
+                                          <AvatarFallback className="text-xs">{(player.name || '').split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??'}</AvatarFallback>
                                         </Avatar>
                                         <div>
                                           <div className="font-semibold">{player.name}</div>
                                           {player.fullName && player.fullName !== player.name && (
-                                            <div className="text-xs text-muted-foreground">{player.fullName}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">{player.fullName}</div>
                                           )}
                                         </div>
                                       </div>
                                     </TableCell>
                                     <TableCell>
-                                      <Badge variant="secondary" className="text-xs">
-                                        {player.position || player.role || 'N/A'}
-                                      </Badge>
+                                      <Badge variant="secondary" className="text-xs">{player.position}</Badge>
                                     </TableCell>
-                                    <TableCell className="text-center">
-                                      {player.age || 'N/A'}
-                                    </TableCell>
+                                    <TableCell className="text-center">{toText((player as any).age) || 'N/A'}</TableCell>
                                     <TableCell className="text-center">
                                       <div className="flex items-center justify-center gap-1">
-                                        {player.country && (
-                                          <img 
-                                            src={`https://images.fotmob.com/image_resources/logo/teamlogo/${player.country.toLowerCase()}.png`}
-                                            alt={player.country}
-                                            className="w-4 h-3 object-cover rounded-sm"
-                                            onError={(e) => {
-                                              e.currentTarget.style.display = 'none';
-                                            }}
-                                          />
+                                        {player.nationality && (
+                                          <img src={`https://images.fotmob.com/image_resources/logo/teamlogo/${String(player.nationality).toLowerCase()}.png`} alt={player.nationality} className="w-4 h-3 object-cover rounded-sm" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
                                         )}
-                                        <span className="text-xs">{player.nationality || player.country || 'N/A'}</span>
+                                        <span className="text-xs">{player.nationality || 'N/A'}</span>
                                       </div>
                                     </TableCell>
-                                    <TableCell className="text-center">
-                                      {player.appearances || player.apps || player.matches || '-'}
-                                    </TableCell>
-                                    <TableCell className="text-center font-semibold text-green-600">
-                                      {player.goals || 0}
-                                    </TableCell>
-                                    <TableCell className="text-center font-semibold text-blue-600">
-                                      {player.assists || 0}
-                                    </TableCell>
+                                    <TableCell className="text-center">{toText((player as any).appearances) || toText((player as any).apps) || toText((player as any).matches) || '-'}</TableCell>
+                                    <TableCell className="text-center font-semibold text-green-600">{Number((player as any).goals) || 0}</TableCell>
+                                    <TableCell className="text-center font-semibold text-blue-600">{Number((player as any).assists) || 0}</TableCell>
                                   </TableRow>
                                 ))}
                               </TableBody>
                             </Table>
                           </div>
-                        </div>
-                      )}
-
-                      {/* Position Groups */}
-                      {teamData.squad?.groups && typeof teamData.squad.groups === 'object' && (
-                        <div className="mt-8">
-                          <h3 className="text-lg font-semibold mb-4">Squad by Position</h3>
-                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {Object.entries(teamData.squad?.groups || {}).map(([position, players]: [string, any]) => (
-                              <Card key={position} className="border-0">
-                                <CardHeader className="pb-3">
-                                  <CardTitle className="text-base capitalize">{position}</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                  {(players as any[]).map((player: any, index: number) => (
-                                    <div key={player.id || index} className="flex items-center gap-2 p-2 rounded hover:bg-muted/50">
-                                      <Avatar className="w-6 h-6">
-                                        <AvatarImage 
-                                          src={player.photo || `https://images.fotmob.com/image_resources/playerimages/${player.id}.png`}
-                                          alt={`${player.name} photo`}
-                                        />
-                                        <AvatarFallback className="text-xs">
-                                          {player.name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || '??'}
-                                        </AvatarFallback>
-                                      </Avatar>
-                                      <div className="flex-1 min-w-0">
-                                        <p className="text-sm font-medium truncate">{player.name}</p>
-                                        <p className="text-xs text-muted-foreground">#{player.number || '-'}</p>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </CardContent>
-                              </Card>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-12">
-                      <Users className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                      <Users className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                       <h3 className="text-lg font-semibold mb-2">Squad Information</h3>
-                      <p className="text-muted-foreground mb-4">
+                      <p className="text-gray-600 dark:text-gray-400 mb-4">
                         Squad information for {details?.name} is not available in the current API response. 
                         This may be due to the off-season period, data privacy restrictions, or the team's squad data not being publicly accessible.
                       </p>
-                      <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+                      <div className="flex items-center justify-center gap-2 text-sm text-gray-500 dark:text-gray-400">
                         <span>Available tabs:</span>
                         {teamData.tabs?.filter((tab: string) => tab !== 'squad').slice(0, 3).map((tab: string, index: number) => (
                           <Badge key={tab} variant="outline" className="text-xs capitalize">
@@ -1030,9 +953,9 @@ export default function Team() {
               </Card>
             </TabsContent>
 
-            {/* Stats Tab */}
-            <TabsContent value="stats" className="mt-0 p-6">
-              <Card className="border-0">
+              {/* Stats Tab */}
+              <TabsContent value="stats" className="mt-0 p-6">
+                <Card className="hover:shadow-md transition-shadow">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Target className="w-5 h-5 text-purple-500" />
@@ -1233,10 +1156,10 @@ export default function Team() {
               </Card>
             </TabsContent>
 
-            {/* Other tabs */}
-            {teamData.tabs.filter(tab => !['overview', 'table', 'fixtures', 'squad', 'stats'].includes(tab)).map((tab) => (
-              <TabsContent key={tab} value={tab} className="mt-0 p-6">
-                <Card className="border-0">
+              {/* Other tabs */}
+              {teamData.tabs.filter(tab => !['overview', 'table', 'fixtures', 'squad', 'stats'].includes(tab)).map((tab) => (
+                <TabsContent key={tab} value={tab} className="mt-0 p-6">
+                  <Card className="hover:shadow-md transition-shadow">
                   <CardHeader>
                     <CardTitle className="capitalize flex items-center gap-2">
                       <Award className="w-5 h-5 text-orange-500" />
@@ -1256,9 +1179,10 @@ export default function Team() {
                 </Card>
               </TabsContent>
             ))}
-          </Tabs>
-        </CardContent>
-      </Card>
+            </Tabs>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

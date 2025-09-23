@@ -43,6 +43,7 @@ interface MatchCardProps {
 }
 
 export default function MatchCard({ match }: MatchCardProps) {
+  const isNotStarted = !match.status.started && !match.status.ongoing && !match.status.finished;
   const getStatusBadge = () => {
     if (match.status.ongoing) {
       return (
@@ -80,6 +81,9 @@ export default function MatchCard({ match }: MatchCardProps) {
   };
 
   const getScoreDisplay = () => {
+    if (isNotStarted) {
+      return "Not started";
+    }
     if (match.status.scoreStr) {
       return match.status.scoreStr;
     }
@@ -136,9 +140,15 @@ export default function MatchCard({ match }: MatchCardProps) {
           </div>
 
           <div className="col-span-1 text-center">
-            <p className="text-sm sm:text-lg font-bold font-mono text-foreground">
-              {getScoreDisplay()}
-            </p>
+            {isNotStarted ? (
+              <Badge variant="secondary" className="text-[10px] sm:text-xs px-2 py-0.5">
+                Not started
+              </Badge>
+            ) : (
+              <p className="text-sm sm:text-lg font-bold font-mono text-foreground">
+                {getScoreDisplay()}
+              </p>
+            )}
           </div>
 
           <div className="col-span-2 flex items-center gap-1 sm:gap-2 justify-end">
