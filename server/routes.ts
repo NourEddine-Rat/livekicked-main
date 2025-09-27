@@ -218,6 +218,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Proxy for player API
+  app.get('/api/player/:playerId', async (req, res) => {
+    console.log('Player API route hit for:', req.params.playerId);
+    try {
+      const { playerId } = req.params;
+      
+      // Validate player ID (should be numeric)
+      if (!playerId || !/^\d+$/.test(playerId)) {
+        return res.status(400).json({ error: 'Invalid player ID format' });
+      }
+      
+      const response = await fetch(`https://api.livekicked.info/api/players/${playerId}/`, {
+        headers: {
+          'Accept': 'application/json; charset=utf-8',
+          'User-Agent': 'FootballLive-App',
+          'Referer': 'https://api.livekicked.info',
+          'Origin': 'https://api.livekicked.info',
+        }
+      });
+
+      if (!response.ok) {
+        console.error(`Player API error for ${playerId}: ${response.status} ${response.statusText}`);
+        return res.status(response.status).json({ 
+          error: `Failed to fetch player data: ${response.statusText}` 
+        });
+      }
+
+      const data = await response.json();
+      console.log('Player data fetched successfully for:', playerId);
+      res.json(data);
+    } catch (error) {
+      console.error('Error fetching player data:', error);
+      res.status(500).json({ error: 'Internal server error fetching player data' });
+    }
+  });
+
   // Proxy for news API
   app.get('/api/news', async (req, res) => {
     console.log('News API route hit');

@@ -9,6 +9,7 @@ import Home from "@/pages/Home";
 import League from "@/pages/League";
 import Match from "@/pages/Match";
 import Team from "@/pages/Team";
+import Player from "@/pages/Player";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -18,6 +19,7 @@ function Router() {
       <Route path="/league/:id" component={League} />
       <Route path="/match/:id" component={Match} />
       <Route path="/team/:id" component={Team} />
+      <Route path="/player/:id" component={Player} />
       <Route component={NotFound} />
     </Switch>
   );

@@ -94,6 +94,8 @@ interface MatchData {
           isHome: boolean;
           newScore?: [number, number];
           card?: string;
+          subIn?: string;
+          subOut?: string;
           shotmapEvent?: {
             x: number;
             y: number;
@@ -105,24 +107,112 @@ interface MatchData {
     };
     lineup?: {
       homeTeam: {
-        players: Array<{
+        starters: Array<{
           id: number;
           name: string;
-          position: string;
-          shirtNumber: number;
-          isStarter: boolean;
+          shirtNumber: string;
+          positionId: number;
+          countryName: string;
+          countryCode: string;
+          horizontalLayout: {
+            x: number;
+            y: number;
+            height: number;
+            width: number;
+          };
+          verticalLayout: {
+            x: number;
+            y: number;
+            height: number;
+            width: number;
+          };
+          performance?: {
+            rating: number;
+            playerOfTheMatch?: boolean;
+            substitutionEvents?: Array<{
+              time: number;
+              type: string;
+              reason: string;
+            }>;
+          };
+          isCaptain?: boolean;
+        }>;
+        subs: Array<{
+          id: number;
+          name: string;
+          shirtNumber: string;
+          countryName: string;
+          countryCode: string;
+          performance?: {
+            rating?: number;
+            substitutionEvents?: Array<{
+              time: number;
+              type: string;
+              reason: string;
+            }>;
+          };
         }>;
         formation: string;
+        coach: {
+          id: number;
+          name: string;
+          countryName: string;
+          countryCode: string;
+        };
       };
       awayTeam: {
-        players: Array<{
+        starters: Array<{
           id: number;
           name: string;
-          position: string;
-          shirtNumber: number;
-          isStarter: boolean;
+          shirtNumber: string;
+          positionId: number;
+          countryName: string;
+          countryCode: string;
+          horizontalLayout: {
+            x: number;
+            y: number;
+            height: number;
+            width: number;
+          };
+          verticalLayout: {
+            x: number;
+            y: number;
+            height: number;
+            width: number;
+          };
+          performance?: {
+            rating: number;
+            playerOfTheMatch?: boolean;
+            substitutionEvents?: Array<{
+              time: number;
+              type: string;
+              reason: string;
+            }>;
+          };
+          isCaptain?: boolean;
+        }>;
+        subs: Array<{
+          id: number;
+          name: string;
+          shirtNumber: string;
+          countryName: string;
+          countryCode: string;
+          performance?: {
+            rating?: number;
+            substitutionEvents?: Array<{
+              time: number;
+              type: string;
+              reason: string;
+            }>;
+          };
         }>;
         formation: string;
+        coach: {
+          id: number;
+          name: string;
+          countryName: string;
+          countryCode: string;
+        };
       };
     };
   };
@@ -652,6 +742,10 @@ export default function Match() {
                             return [phase, minute, 0];
                           }
                           
+                          if (!timeStr) {
+                            return [0, 0, 0]; // Default fallback for undefined/null
+                          }
+                          
                           const str = timeStr.toString().trim();
                           
                           // Handle exact special markers
@@ -689,7 +783,7 @@ export default function Match() {
                       })
                       .map((event, index) => {
                         const isHome = event.isHome;
-                        const displayTime = typeof event.timeStr === 'number' ? `${event.timeStr}'` : event.timeStr.toString();
+                        const displayTime = typeof event.timeStr === 'number' ? `${event.timeStr}'` : (event.timeStr?.toString() || '');
                         
                         return (
                           <div key={index} className={`relative flex items-center ${isHome ? 'justify-start' : 'justify-end'}`}>
@@ -1030,320 +1124,229 @@ export default function Match() {
                 </CardHeader>
               </Card>
 
-              {/* Visual Football Field - Grid Layout */}
+              {/* Visual Football Field - Precise Positioning */}
               <Card>
                 <CardContent className="p-3">
                   <div className="relative w-full max-w-5xl mx-auto">
-                    {(() => {
-                      // Helper function to get grid positions based on formation
-                      const getGridPositions = (formation: string, side: 'home' | 'away', players: any[]) => {
-                        // Players are already starters in this data structure, no need to filter
-                        const starters = players;
+                    <div className="relative bg-gradient-to-r from-green-400 to-green-500 dark:from-green-700 dark:to-green-800 rounded-lg overflow-hidden" style={{aspectRatio: '190/100'}}>
+                      {/* Football Field Background */}
+                      <div 
+                        className="relative w-full h-full min-h-[400px]"
+                        style={{
+                          backgroundImage: `
+                            linear-gradient(to right, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%),
+                            linear-gradient(to bottom, transparent 0%, rgba(255,255,255,0.1) 50%, transparent 100%),
+                            radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 0%, transparent 70%)
+                          `
+                        }}
+                      >
+                        {/* Center Circle */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-16 h-16 border-2 border-white/30 rounded-full"></div>
+                        </div>
                         
-                        // Robust formation parsing with fallback
-                        let formationNumbers = [4, 4, 2]; // Default formation
-                        if (formation && typeof formation === 'string') {
-                          const parsed = formation.split('-').map(Number).filter(n => n > 0 && n <= 5);
-                          if (parsed.length >= 2 && parsed.reduce((a, b) => a + b, 0) <= 10) {
-                            formationNumbers = parsed;
+                        {/* Center Line */}
+                        <div className="absolute top-1/2 left-0 right-0 h-px bg-white/30 transform -translate-y-1/2"></div>
+                        
+                        {/* Goal Areas */}
+                        <div className="absolute top-1/2 left-0 w-8 h-16 border-2 border-white/30 transform -translate-y-1/2"></div>
+                        <div className="absolute top-1/2 right-0 w-8 h-16 border-2 border-white/30 transform -translate-y-1/2"></div>
+                        
+                        {/* Penalty Areas */}
+                        <div className="absolute top-1/2 left-0 w-16 h-24 border-2 border-white/30 transform -translate-y-1/2"></div>
+                        <div className="absolute top-1/2 right-0 w-16 h-24 border-2 border-white/30 transform -translate-y-1/2"></div>
+                        
+                        {/* Render Home Team Players (Right Half) */}
+                        {matchData.content.lineup.homeTeam.starters.map((player) => {
+                          const playerImageUrl = `https://images.fotmob.com/image_resources/playerimages/${player.id}.png`;
+                          const playerRating = player.performance?.rating || (matchData.general.started ? (5.5 + (player.id % 100) / 100 * 4).toFixed(1) : null);
+                          
+                          // Convert horizontal layout to right half positioning with expanded vertical spacing
+                          const adjustedX = 50 + (player.horizontalLayout.x * 50); // Right half (50-100%)
+                          let adjustedY = 10 + (player.horizontalLayout.y * 80); // Expanded vertical space (10-90%)
+                          
+                          // Move wingers more forward for better formation look
+                          if (player.positionId === 79 || player.positionId === 81) { // LW/RW positions
+                            adjustedY = Math.max(5, adjustedY - 15); // Move forward by 15%
                           }
-                        }
-                        
-                        // Group players by position
-                        const goalkeepers = starters.filter((p: any) => 
-                          p.position?.toUpperCase().includes('GK') || p.position?.toUpperCase().includes('G')
-                        );
-                        const defenders = starters.filter((p: any) => 
-                          ['CB', 'LB', 'RB', 'WB', 'LWB', 'RWB', 'DEF'].some(pos => 
-                            p.position?.toUpperCase().includes(pos)
-                          )
-                        );
-                        const midfielders = starters.filter((p: any) => 
-                          ['CM', 'CDM', 'CAM', 'LM', 'RM', 'DM', 'AM', 'MID'].some(pos => 
-                            p.position?.toUpperCase().includes(pos)
-                          )
-                        );
-                        const forwards = starters.filter((p: any) => 
-                          ['ST', 'CF', 'LW', 'RW', 'FW', 'ATT'].some(pos => 
-                            p.position?.toUpperCase().includes(pos)
-                          )
-                        );
-                        
-                        // Fallback: if position-based grouping fails, use array order
-                        let playerGroups = [goalkeepers, defenders, midfielders, forwards];
-                        if (goalkeepers.length === 0 || 
-                            defenders.length + midfielders.length + forwards.length < starters.length - 1) {
-                          // Fallback to array order with GK first
-                          const gk = starters[0] || null;
-                          const outfield = starters.slice(1);
-                          const defCount = formationNumbers[0] || 4;
-                          const midCount = formationNumbers[1] || 4;
                           
-                          playerGroups = [
-                            gk ? [gk] : [],
-                            outfield.slice(0, defCount),
-                            outfield.slice(defCount, defCount + midCount),
-                            outfield.slice(defCount + midCount)
-                          ];
-                        }
-                        
-                        const [gks, defs, mids, fwds] = playerGroups;
-                        const formations = [gks.length, ...formationNumbers];
-                        const playersByLine = [gks, defs, mids, fwds];
-                        
-                        const positions: Array<{player: any, row: number, col: number}> = [];
-                        
-                        // Process each line
-                        formations.forEach((expectedCount, lineIndex) => {
-                          if (lineIndex >= playersByLine.length) return;
-                          
-                          const playersInLine = playersByLine[lineIndex].slice(0, expectedCount);
-                          if (playersInLine.length === 0) return;
-                          
-                          // Calculate row position
-                          const row = side === 'home' 
-                            ? 6 - lineIndex  // Home: GK at row 6, defenders at 5, mids at 4, forwards at 3
-                            : lineIndex + 1; // Away: GK at row 1, defenders at 2, mids at 3, forwards at 4
-                          
-                          // Calculate column positions for this line
-                          playersInLine.forEach((player, playerIndex) => {
-                            let col;
-                            const lineSize = playersInLine.length;
-                            
-                            if (lineSize === 1) {
-                              col = 5; // Center position for goalkeeper or single striker
-                            } else if (lineSize === 2) {
-                              col = [3, 7][playerIndex] || 5;
-                            } else if (lineSize === 3) {
-                              col = [2, 5, 8][playerIndex] || 5;
-                            } else if (lineSize === 4) {
-                              col = [2, 4, 6, 8][playerIndex] || 5;
-                            } else if (lineSize === 5) {
-                              col = [1, 3, 5, 7, 9][playerIndex] || 5;
-                            } else {
-                              // Fallback for unusual formations
-                              const spacing = 8 / (lineSize + 1);
-                              col = Math.round(2 + (playerIndex + 1) * spacing);
-                            }
-                            
-                            positions.push({ player, row, col: Math.max(1, Math.min(10, col)) });
-                          });
-                        });
-                        
-                        return positions;
-                      };
-                      
-                      // Get player image URL helper
-                      const getPlayerImageUrl = (player: any) => {
-                        try {
-                          if (player.id) return `https://images.fotmob.com/image_resources/playerimages/${player.id}.png`;
-                          if (player.profileUrl) {
-                            const match = player.profileUrl.match(/players\/(\d+)/);
-                            if (match) return `https://images.fotmob.com/image_resources/playerimages/${match[1]}.png`;
-                          }
-                        } catch {}
-                        return null;
-                      };
-                      
-                      // Get player rating helper
-                      const getPlayerRating = (player: any) => {
-                        if (player.rating) return player.rating;
-                        if (matchData.content?.matchFacts?.playerOfTheMatch?.id === player.id) {
-                          return matchData.content.matchFacts.playerOfTheMatch.rating?.num;
-                        }
-                        if (matchData.general.started && player.id) {
-                          const seed = player.id % 100;
-                          const rating = 5.5 + (seed / 100) * 4;
-                          return rating.toFixed(1);
-                        }
-                        return null;
-                      };
-                      
-                      // Fixed: Use 'starters' instead of 'players' based on actual data structure
-                      
-                      // Get positions for both teams
-                      const homePositions = getGridPositions(
-                        matchData.content.lineup?.homeTeam?.formation || '4-4-2',
-                        'home',
-                        matchData.content.lineup?.homeTeam?.starters || []
-                      );
-                      
-                      const awayPositions = getGridPositions(
-                        matchData.content.lineup?.awayTeam?.formation || '4-4-2',
-                        'away',
-                        matchData.content.lineup?.awayTeam?.starters || []
-                      );
-                      
-                      return (
-                        <div className="relative bg-gradient-to-r from-green-400 to-green-500 dark:from-green-700 dark:to-green-800 rounded-lg overflow-hidden" style={{aspectRatio: '160/100'}}>
-                          {/* Football Field Background with CSS Grid */}
-                          <div 
-                            className="grid grid-cols-10 grid-rows-6 gap-0 relative w-full h-full min-h-[400px]" 
-                            style={{
-                              backgroundImage: `
-                                linear-gradient(90deg, rgba(255,255,255,0.1) 50%, transparent 50%),
-                                linear-gradient(rgba(255,255,255,0.1) 50%, transparent 50%)
-                              `,
-                              backgroundSize: '10% 16.67%'
-                            }}
-                          >
-                            {/* Field markings overlay */}
-                            <div className="absolute inset-2 border-2 border-white/50 rounded-sm">
-                              {/* Center line */}
-                              <div className="absolute left-1/2 top-0 bottom-0 w-0.5 bg-white/50 transform -translate-x-0.5"></div>
-                              {/* Center circle */}
-                              <div className="absolute left-1/2 top-1/2 w-16 h-16 border-2 border-white/50 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-                              <div className="absolute left-1/2 top-1/2 w-2 h-2 bg-white/50 rounded-full transform -translate-x-1/2 -translate-y-1/2"></div>
-                              
-                              {/* Penalty areas */}
-                              <div className="absolute left-2 top-1/4 w-12 h-1/2 border-2 border-white/50"></div>
-                              <div className="absolute right-2 top-1/4 w-12 h-1/2 border-2 border-white/50"></div>
-                              
-                              {/* Goal areas */}
-                              <div className="absolute left-2 top-1/3 w-6 h-1/3 border-2 border-white/50"></div>
-                              <div className="absolute right-2 top-1/3 w-6 h-1/3 border-2 border-white/50"></div>
-                              
-                              {/* Goals */}
-                              <div className="absolute -left-1 top-5/12 w-2 h-1/6 border-2 border-white/50"></div>
-                              <div className="absolute -right-1 top-5/12 w-2 h-1/6 border-2 border-white/50"></div>
-                            </div>
-                            
-                            {/* Home Team Players */}
-                            {homePositions.map(({ player, row, col }, index) => {
-                              const imageUrl = getPlayerImageUrl(player);
-                              const playerRating = getPlayerRating(player);
-                              
-                              return (
-                                <div
-                                  key={`home-${player.id || index}`}
-                                  className="flex flex-col items-center justify-center relative z-10"
-                                  style={{
-                                    gridRowStart: row,
-                                    gridColumnStart: col
-                                  }}
-                                >
-                                  {/* Player Circle */}
-                                  <div className="relative w-10 h-10 bg-white rounded-full border-2 border-blue-500 flex items-center justify-center shadow-lg">
-                                    {imageUrl ? (
-                                      <img 
-                                        src={imageUrl} 
-                                        alt={player.name}
-                                        className="w-8 h-8 rounded-full object-cover"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      />
-                                    ) : (
-                                      <span className="text-xs font-bold text-blue-600">
-                                        {player.name.split(' ').filter((n: string) => n.length > 0).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                                      </span>
-                                    )}
-                                    
-                                    {/* Jersey Number */}
-                                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-blue-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                                      {player.shirtNumber}
-                                    </div>
-                                    
-                                    {/* Cards */}
-                                    {player.cards && player.cards.length > 0 && (
-                                      <div className={`absolute -top-1 -left-2 w-2 h-3 ${player.cards.includes('red') ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
-                                    )}
+                          return (
+                            <div
+                              key={`home-${player.id}`}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
+                              style={{
+                                left: `${adjustedX}%`,
+                                top: `${adjustedY}%`,
+                              }}
+                            >
+                              <div className="relative">
+                                {/* Player Circle with Image */}
+                                <div className={`relative w-12 h-12 rounded-full border-2 border-white shadow-lg overflow-hidden hover:scale-110 transition-transform cursor-pointer bg-white ${
+                                  player.performance?.playerOfTheMatch ? 'ring-2 ring-yellow-400' : ''
+                                }`}>
+                                  <img 
+                                    src={playerImageUrl} 
+                                    alt={player.name}
+                                    className="w-full h-full object-cover rounded-full"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (nextElement) {
+                                        nextElement.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                  <div className="w-full h-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold rounded-full" style={{display: 'none'}}>
+                                    {player.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
                                   </div>
-                                  
-                                  {/* Player Name */}
-                                  <div className="text-white text-xs font-bold mt-1 text-center leading-tight max-w-16 truncate">
-                                    {player.name.split(' ').pop()}
-                                  </div>
-                                  
-                                  {/* Player Rating */}
-                                  {matchData.general.started && playerRating && (
-                                    <div className={`text-xs px-1.5 py-0.5 rounded mt-0.5 text-white font-bold ${
-                                      parseFloat(playerRating) >= 8.0 ? 'bg-green-500' :
-                                      parseFloat(playerRating) >= 7.0 ? 'bg-blue-500' :
-                                      parseFloat(playerRating) >= 6.0 ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    }`}>
-                                      {parseFloat(playerRating).toFixed(1)}
-                                    </div>
-                                  )}
                                 </div>
-                              );
-                            })}
-                            
-                            {/* Away Team Players */}
-                            {awayPositions.map(({ player, row, col }, index) => {
-                              const imageUrl = getPlayerImageUrl(player);
-                              const playerRating = getPlayerRating(player);
-                              
-                              return (
-                                <div
-                                  key={`away-${player.id || index}`}
-                                  className="flex flex-col items-center justify-center relative z-10"
-                                  style={{
-                                    gridRowStart: row,
-                                    gridColumnStart: col
-                                  }}
-                                >
-                                  {/* Player Circle */}
-                                  <div className="relative w-10 h-10 bg-white rounded-full border-2 border-red-500 flex items-center justify-center shadow-lg">
-                                    {imageUrl ? (
-                                      <img 
-                                        src={imageUrl} 
-                                        alt={player.name}
-                                        className="w-8 h-8 rounded-full object-cover"
-                                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                                      />
-                                    ) : (
-                                      <span className="text-xs font-bold text-red-600">
-                                        {player.name.split(' ').filter((n: string) => n.length > 0).map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
-                                      </span>
-                                    )}
-                                    
-                                    {/* Jersey Number */}
-                                    <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">
-                                      {player.shirtNumber}
-                                    </div>
-                                    
-                                    {/* Cards */}
-                                    {player.cards && player.cards.length > 0 && (
-                                      <div className={`absolute -top-1 -left-2 w-2 h-3 ${player.cards.includes('red') ? 'bg-red-500' : 'bg-yellow-500'}`}></div>
-                                    )}
+                                
+                                {/* Player Rating on top right */}
+                                {playerRating && (
+                                  <div className={`absolute -top-2 -right-2 text-xs px-1.5 py-0.5 rounded text-white font-bold border border-white z-10 ${
+                                    parseFloat(String(playerRating)) >= 8.0 ? 'bg-green-500' :
+                                    parseFloat(String(playerRating)) >= 7.0 ? 'bg-blue-500' :
+                                    parseFloat(String(playerRating)) >= 6.0 ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                  }`}>
+                                    {parseFloat(String(playerRating)).toFixed(1)}
                                   </div>
-                                  
-                                  {/* Player Name */}
-                                  <div className="text-white text-xs font-bold mt-1 text-center leading-tight max-w-16 truncate">
-                                    {player.name.split(' ').pop()}
+                                )}
+                                
+                                {/* Captain Badge */}
+                                {player.isCaptain && (
+                                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-500 text-white text-xs rounded-full flex items-center justify-center font-bold border border-white z-10">
+                                    ©
                                   </div>
-                                  
-                                  {/* Player Rating */}
-                                  {matchData.general.started && playerRating && (
-                                    <div className={`text-xs px-1.5 py-0.5 rounded mt-0.5 text-white font-bold ${
-                                      parseFloat(playerRating) >= 8.0 ? 'bg-green-500' :
-                                      parseFloat(playerRating) >= 7.0 ? 'bg-blue-500' :
-                                      parseFloat(playerRating) >= 6.0 ? 'bg-yellow-500' :
-                                      'bg-red-500'
-                                    }`}>
-                                      {parseFloat(playerRating).toFixed(1)}
-                                    </div>
-                                  )}
+                                )}
+                                
+                                {/* Player of the Match */}
+                                {player.performance?.playerOfTheMatch && (
+                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 text-white text-xs rounded-full flex items-center justify-center font-bold border border-white z-10">
+                                    🏆
+                                  </div>
+                                )}
+                                
+                                {/* Player Name with Jersey Number */}
+                                <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-white text-xs font-bold text-center whitespace-nowrap">
+                                  {player.shirtNumber} {player.name.split(' ').pop()}
                                 </div>
-                              );
-                            })}
-                            
-                            {/* Debug info - show if no players positioned */}
-                            {homePositions.length === 0 && awayPositions.length === 0 && (
-                              <div className="col-span-10 row-span-6 flex items-center justify-center text-white font-bold">
-                                <div className="text-center">
-                                  <div>No lineup data available</div>
-                                  <div className="text-sm opacity-75 mt-2">
-                                    {matchData.content.lineup?.homeTeam?.starters?.length || 0} home starters, 
-                                    {matchData.content.lineup?.awayTeam?.starters?.length || 0} away starters
+                                
+                                {/* Hover Tooltip */}
+                                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                                  <div className="font-medium">{player.name}</div>
+                                  <div className="text-xs opacity-75">
+                                    {player.countryCode} • {playerRating ? `${playerRating} ⭐` : 'N/A'}
                                   </div>
+                                  {player.performance?.playerOfTheMatch && (
+                                    <div className="text-xs text-yellow-400">Player of the Match</div>
+                                  )}
                                 </div>
                               </div>
-                            )}
-                          </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Render Away Team Players (Left Half) */}
+                        {matchData.content.lineup.awayTeam.starters.map((player) => {
+                          const playerImageUrl = `https://images.fotmob.com/image_resources/playerimages/${player.id}.png`;
+                          const playerRating = player.performance?.rating || (matchData.general.started ? (5.5 + (player.id % 100) / 100 * 4).toFixed(1) : null);
+                          
+                          // Convert horizontal layout to left half positioning with expanded vertical spacing
+                          const adjustedX = player.horizontalLayout.x * 50; // Left half (0-50%)
+                          let adjustedY = 10 + (player.horizontalLayout.y * 80); // Expanded vertical space (10-90%)
+                          
+                          // Move wingers more forward for better formation look
+                          if (player.positionId === 79 || player.positionId === 81) { // LW/RW positions
+                            adjustedY = Math.max(5, adjustedY - 15); // Move forward by 15%
+                          }
+                          
+                          return (
+                            <div
+                              key={`away-${player.id}`}
+                              className="absolute transform -translate-x-1/2 -translate-y-1/2 group"
+                              style={{
+                                left: `${adjustedX}%`,
+                                top: `${adjustedY}%`,
+                              }}
+                            >
+                              <div className="relative">
+                                {/* Player Circle with Image */}
+                                <div className={`relative w-12 h-12 rounded-full border-2 border-white shadow-lg overflow-hidden hover:scale-110 transition-transform cursor-pointer bg-white ${
+                                  player.performance?.playerOfTheMatch ? 'ring-2 ring-yellow-400' : ''
+                                }`}>
+                                  <img 
+                                    src={playerImageUrl} 
+                                    alt={player.name}
+                                    className="w-full h-full object-cover rounded-full"
+                                    onError={(e) => {
+                                      e.currentTarget.style.display = 'none';
+                                      const nextElement = e.currentTarget.nextElementSibling as HTMLElement;
+                                      if (nextElement) {
+                                        nextElement.style.display = 'flex';
+                                      }
+                                    }}
+                                  />
+                                  <div className="w-full h-full bg-red-600 flex items-center justify-center text-white text-xs font-bold rounded-full" style={{display: 'none'}}>
+                                    {player.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                                  </div>
+                                </div>
+                                
+                                {/* Player Rating on top right */}
+                                {playerRating && (
+                                  <div className={`absolute -top-2 -right-2 text-xs px-1.5 py-0.5 rounded text-white font-bold border border-white z-10 ${
+                                    parseFloat(String(playerRating)) >= 8.0 ? 'bg-green-500' :
+                                    parseFloat(String(playerRating)) >= 7.0 ? 'bg-blue-500' :
+                                    parseFloat(String(playerRating)) >= 6.0 ? 'bg-yellow-500' :
+                                    'bg-red-500'
+                                  }`}>
+                                    {parseFloat(String(playerRating)).toFixed(1)}
+                                  </div>
+                                )}
+                                
+                                {/* Captain Badge */}
+                                {player.isCaptain && (
+                                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-500 text-white text-xs rounded-full flex items-center justify-center font-bold border border-white z-10">
+                                    ©
+                                  </div>
+                                )}
+                                
+                                {/* Player of the Match */}
+                                {player.performance?.playerOfTheMatch && (
+                                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-500 text-white text-xs rounded-full flex items-center justify-center font-bold border border-white z-10">
+                                    🏆
+                                  </div>
+                                )}
+                                
+                                {/* Player Name with Jersey Number */}
+                                <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 text-white text-xs font-bold text-center whitespace-nowrap">
+                                  {player.shirtNumber} {player.name.split(' ').pop()}
+                                </div>
+                                
+                                {/* Hover Tooltip */}
+                                <div className="absolute -bottom-16 left-1/2 transform -translate-x-1/2 bg-black/90 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                                  <div className="font-medium">{player.name}</div>
+                                  <div className="text-xs opacity-75">
+                                    {player.countryCode} • {playerRating ? `${playerRating} ⭐` : 'N/A'}
+                                  </div>
+                                  {player.performance?.playerOfTheMatch && (
+                                    <div className="text-xs text-yellow-400">Player of the Match</div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        
+                        {/* Team Names */}
+                        <div className="absolute top-2 right-2 text-white font-bold text-sm bg-blue-600/80 px-2 py-1 rounded">
+                          {homeTeam.name} (Home)
                         </div>
-                      );
-                    })()}
+                        <div className="absolute top-2 left-2 text-white font-bold text-sm bg-red-600/80 px-2 py-1 rounded">
+                          {awayTeam.name} (Away)
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -1357,7 +1360,7 @@ export default function Match() {
                   </CardHeader>
                   <CardContent className="pt-2">
                     <div className="space-y-1">
-                      {matchData.content.lineup?.homeTeam.players?.filter((p: any) => !p.isStarter).map((player: any, index: number) => (
+                      {matchData.content.lineup?.homeTeam.subs?.map((player: any, index: number) => (
                         <div key={index} className="flex items-center gap-2 text-sm">
                           <Badge variant="secondary" className="w-5 h-5 text-xs p-0 flex items-center justify-center">
                             {player.shirtNumber}
@@ -1377,7 +1380,7 @@ export default function Match() {
                   </CardHeader>
                   <CardContent className="pt-2">
                     <div className="space-y-1">
-                      {matchData.content.lineup?.awayTeam.players?.filter((p: any) => !p.isStarter).map((player: any, index: number) => (
+                      {matchData.content.lineup?.awayTeam.subs?.map((player: any, index: number) => (
                         <div key={index} className="flex items-center gap-2 text-sm">
                           <Badge variant="secondary" className="w-5 h-5 text-xs p-0 flex items-center justify-center">
                             {player.shirtNumber}
